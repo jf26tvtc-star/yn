@@ -1,22 +1,18 @@
 <?php
-session_start();
-include '../db.php';
-check_admin();
+require __DIR__ . '/partials/init.php';
 
-$id = (int)($_GET['id'] ?? 0);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('categories.php');
+verify_csrf();
 
-if ($id > 0) {
-    try {
-        $d = $conn->prepare('DELETE FROM categories WHERE id=?');
-        $d->bind_param('i', $id);
-        $d->execute();
-        $_SESSION['flash'] = 'تم حذف الفئة بنجاح';
-    } catch (mysqli_sql_exception $e) {
-        // قيد المفتاح الأجنبي يمنع حذف فئة مرتبطة بأماكن (FOREIGN KEY RESTRICT)
-        $_SESSION['flash_error'] = 'لا يمكن حذف هذه الفئة لأنها مستخدمة في أماكن موجودة. عدّل تلك الأماكن إلى فئة أخرى أولًا.';
-    }
+$id = (int)($_POST['id'] ?? 0);
+try {
+    $delete = $conn->prepare('DELETE FROM categories WHERE id = ?');
+    $delete->bind_param('i', $id);
+    $delete->execute();
+    flash($delete->affected_rows > 0 ? 'تم حذف التصنيف بنجاح ✓' : 'التصنيف غير موجود.', $delete->affected_rows > 0 ? 'success' : 'error');
+} catch (mysqli_sql_exception $e) {
+    // قيد المفتاح الأجنبي يمنع حذف تصنيف مرتبط بأماكن
+    flash('لا يمكن حذف هذا التصنيف لأنه مستخدم في أماكن موجودة. انقل تلك الأماكن إلى تصنيف آخر أولًا.', 'error');
 }
 
-header('Location: categories.php');
-exit();
-?>
+redirect('categories.php');

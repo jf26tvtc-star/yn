@@ -1,5 +1,5 @@
 <?php
-session_start();
+require __DIR__ . '/includes/bootstrap.php';
 
 $destinations = [
     'sea' => [
@@ -30,58 +30,41 @@ $destinations = [
         ],
     ],
 ];
+
 $area = $_GET['area'] ?? '';
 $destination = is_string($area) ? ($destinations[$area] ?? null) : null;
 if ($destination === null) {
-    http_response_code(404);
+    require __DIR__ . '/404.php';
+    exit();
 }
-$title = $destination !== null ? $destination['name'] : 'الوجهة غير موجودة';
+
+$pageTitle = $destination['name'];
+$activeNav = $area;
+require __DIR__ . '/includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($title); ?> - روح ينبع</title>
-    <link rel="stylesheet" href="css/style.css?v=<?= substr((string)@md5_file(__DIR__ . '/css/style.css'), 0, 8) ?>">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Markazi+Text:wght@500;600;700&display=swap" rel="stylesheet">
-</head>
-<body>
-    <?php require __DIR__ . '/nav.php'; ?>
-    <main>
-        <section class="hero">
+        <section class="hero hero-small">
             <div class="container">
-                <h2><?php echo htmlspecialchars($title); ?></h2>
-                <p><?php echo $destination !== null ? htmlspecialchars($destination['intro']) : 'الرابط المطلوب غير صحيح. اختر إحدى مناطق ينبع من القائمة.'; ?></p>
+                <h1><?= e($destination['name']) ?></h1>
+                <p><?= e($destination['intro']) ?></p>
             </div>
         </section>
+
         <section class="container">
-            <?php if ($destination !== null): ?>
-                <h2>أفكار لزيارتك</h2>
-                <div class="category-grid">
-                    <?php foreach ($destination['activities'] as $activity): ?>
-                        <article class="category-card">
-                            <div class="cc-body">
-                                <h3><?php echo htmlspecialchars($activity['title']); ?></h3>
-                                <p><?php echo htmlspecialchars($activity['text']); ?></p>
-                            </div>
-                        </article>
-                    <?php endforeach; ?>
-                </div>
-                <p>تظهر الأماكن المسجلة التي يرد اسم المنطقة في اسمها أو وصفها أو موقعها.</p>
-                <a class="btn" href="places.php?search=<?php echo urlencode($destination['name']); ?>">اكتشف أماكن <?php echo htmlspecialchars($destination['name']); ?></a>
-                <a class="btn" href="trip.php">خطط رحلتك</a>
-            <?php else: ?>
-                <a class="btn" href="index.php">العودة للرئيسية</a>
-            <?php endif; ?>
+            <h2>أفكار لزيارتك</h2>
+            <div class="category-grid">
+                <?php foreach ($destination['activities'] as $activity): ?>
+                    <article class="category-card">
+                        <div class="cc-body">
+                            <h3><?= e($activity['title']) ?></h3>
+                            <p><?= e($activity['text']) ?></p>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+            <p class="section-note">تظهر الأماكن المسجلة التي يرد اسم المنطقة في اسمها أو وصفها أو موقعها.</p>
+            <div class="btn-row">
+                <a class="btn" href="places.php?search=<?= urlencode($destination['name']) ?>">اكتشف أماكن <?= e($destination['name']) ?></a>
+                <a class="btn btn-secondary" href="trip.php">خطط رحلتك</a>
+            </div>
         </section>
-    </main>
-    <footer>
-        <div class="container">
-            <p>&copy; 2026 روح ينبع | جميع الحقوق محفوظة</p>
-            <a href="contact.php">تواصل معنا</a>
-            <p class="footer-admin"><a href="admin/dashboard.php">لوحة التحكم</a></p>
-        </div>
-    </footer>
-</body>
-</html>
+<?php require __DIR__ . '/includes/footer.php'; ?>

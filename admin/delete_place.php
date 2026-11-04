@@ -1,10 +1,24 @@
 <?php
-session_start(); include '../db.php'; check_admin();
-$id=(int)($_GET['id']??0);
-if($id>0){
- $q=$conn->prepare('SELECT image_path FROM images WHERE place_id=?'); $q->bind_param('i',$id); $q->execute(); $imgs=$q->get_result();
- $d=$conn->prepare('DELETE FROM places WHERE id=?'); $d->bind_param('i',$id);
- if($d->execute()){while($r=$imgs->fetch_assoc()){delete_place_image_file($r['image_path']);}}
+require __DIR__ . '/partials/init.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('places.php');
+verify_csrf();
+
+$id = (int)($_POST['id'] ?? 0);
+$query = $conn->prepare('SELECT image_path FROM images WHERE place_id = ?');
+$query->bind_param('i', $id);
+$query->execute();
+$files = array_column($query->get_result()->fetch_all(MYSQLI_ASSOC), 'image_path');
+
+// حذف المكان يحذف سجلات صوره تلقائيًا (ON DELETE CASCADE)، ثم نحذف ملفات الصور
+$delete = $conn->prepare('DELETE FROM places WHERE id = ?');
+$delete->bind_param('i', $id);
+$delete->execute();
+if ($delete->affected_rows > 0) {
+    foreach ($files as $file) delete_upload_file($file);
+    flash('تم حذف المكان بنجاح ✓');
+} else {
+    flash('المكان غير موجود، ربما تم حذفه مسبقًا.', 'error');
 }
-header('Location: places-list.php'); exit();
-?>
+
+redirect('places.php');

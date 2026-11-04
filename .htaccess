@@ -1,0 +1,11 @@
+# إعدادات Apache للمشروع (XAMPP)
+Options -Indexes
+DirectoryIndex index.php
+
+# صفحة 404 مخصّصة (المسار يفترض أن مجلد المشروع اسمه yanbu-tourism داخل htdocs)
+ErrorDocument 404 /yanbu-tourism/404.php
+
+# منع الوصول لملفات الإعداد والتوثيق مباشرة من المتصفح
+<FilesMatch "\.(sql|md|log|ini)$">
+    Require all denied
+</FilesMatch>

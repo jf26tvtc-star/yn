@@ -1,60 +1,63 @@
 <?php
-session_start();
-include '../db.php';
+require __DIR__ . '/../includes/bootstrap.php';
+
+if (is_admin()) redirect('dashboard.php');
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCK_SECONDS = 60;
 
 $error = '';
+$username = '';
+$lockedFor = max(0, ($_SESSION['login_locked_until'] ?? 0) - time());
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = clean($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? ''; // لا نستخدم clean()/htmlspecialchars هنا حتى لا نُفسد كلمات المرور التي تحتوي رموزًا خاصة
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $username = trim((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
 
-    $stmt = $conn->prepare("SELECT * FROM users WHERE username = ? AND role = 'admin'");
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows > 0) {
-        $admin = $result->fetch_assoc();
-        if (password_verify($password, $admin['password'])) {
-            session_regenerate_id(true);
-            $_SESSION['admin_id'] = $admin['id'];
-            $_SESSION['admin_username'] = $admin['username'];
-            header("Location: dashboard.php");
-            exit();
-        } else {
-            $error = "اسم المستخدم أو كلمة المرور غير صحيحة";
-        }
+    if ($lockedFor > 0) {
+        $error = 'محاولات كثيرة خاطئة. حاول مرة أخرى بعد ' . $lockedFor . ' ثانية.';
+    } elseif ($username === '' || $password === '') {
+        $error = 'يرجى إدخال اسم المستخدم وكلمة المرور';
     } else {
-        $error = "اسم المستخدم أو كلمة المرور غير صحيحة";
+        $conn = db();
+        $stmt = $conn->prepare("SELECT id, username, password FROM users WHERE username = ? AND role = 'admin' LIMIT 1");
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $admin = $stmt->get_result()->fetch_assoc();
+
+        if ($admin && password_verify($password, $admin['password'])) {
+            session_regenerate_id(true);
+            unset($_SESSION['login_attempts'], $_SESSION['login_locked_until']);
+            $_SESSION['admin_id'] = (int)$admin['id'];
+            $_SESSION['admin_username'] = $admin['username'];
+            redirect('dashboard.php');
+        }
+
+        $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
+        if ($_SESSION['login_attempts'] >= MAX_LOGIN_ATTEMPTS) {
+            $_SESSION['login_attempts'] = 0;
+            $_SESSION['login_locked_until'] = time() + LOGIN_LOCK_SECONDS;
+        }
+        $error = 'اسم المستخدم أو كلمة المرور غير صحيحة';
     }
 }
+
+$base = '../';
+$pageTitle = 'دخول لوحة التحكم';
+require __DIR__ . '/../includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>دخول الأدمن - روح ينبع</title>
-    <link rel="stylesheet" href="../css/style.css?v=<?= substr((string)@md5_file(__DIR__ . '/../css/style.css'), 0, 8) ?>">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Markazi+Text:wght@500;600;700&display=swap" rel="stylesheet">
-</head>
-<body>
-    <nav class="navbar">
-        <div class="container">
-            <h1>🌴 روح ينبع - لوحة التحكم</h1>
-        </div>
-    </nav>
-
-    <form method="POST" class="login-form">
-        <h2>🔐 دخول الأدمن</h2>
-
-        <?php if($error) { ?>
-            <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
-        <?php } ?>
-
-        <input type="text" name="username" placeholder="اسم المستخدم" required>
-        <input type="password" name="password" placeholder="كلمة المرور" required>
-        <button type="submit" class="btn">دخول</button>
-    </form>
-</body>
-</html>
+        <section class="container login-section">
+            <form method="post" class="login-form" autocomplete="on">
+                <h1>🔐 دخول لوحة التحكم</h1>
+                <p class="section-sub">أدخل اسم المستخدم وكلمة المرور للمتابعة</p>
+                <?php if ($error): ?><div class="alert alert-danger" role="alert"><?= e($error) ?></div><?php endif; ?>
+                <?= csrf_field() ?>
+                <label for="username">اسم المستخدم</label>
+                <input type="text" id="username" name="username" value="<?= e($username) ?>" autocomplete="username" required autofocus>
+                <label for="password">كلمة المرور</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" required>
+                <button type="submit" class="btn">دخول</button>
+            </form>
+        </section>
+<?php require __DIR__ . '/../includes/footer.php'; ?>

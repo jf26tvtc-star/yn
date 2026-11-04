@@ -1,69 +1,77 @@
 <?php
-session_start();
-include '../db.php';
-check_admin();
+require __DIR__ . '/partials/init.php';
 
-$success = $_SESSION['flash'] ?? '';
-$error = $_SESSION['flash_error'] ?? '';
-unset($_SESSION['flash'], $_SESSION['flash_error']);
+$error = '';
+$values = ['name' => '', 'description' => ''];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add') {
-    $name = trim($_POST['name'] ?? '');
-    $description = trim($_POST['description'] ?? '');
-    if ($name === '') {
-        $error = 'يرجى إدخال اسم الفئة';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $values['name'] = trim((string)($_POST['name'] ?? ''));
+    $values['description'] = trim((string)($_POST['description'] ?? ''));
+
+    if ($values['name'] === '') {
+        $error = 'يرجى إدخال اسم التصنيف';
+    } elseif (mb_strlen($values['name']) > 100 || mb_strlen($values['description']) > 255) {
+        $error = 'الاسم أو الوصف أطول من المسموح';
     } else {
         try {
             $stmt = $conn->prepare('INSERT INTO categories (name, description) VALUES (?, ?)');
-            $stmt->bind_param('ss', $name, $description);
+            $stmt->bind_param('ss', $values['name'], $values['description']);
             $stmt->execute();
-            $success = 'تمت إضافة الفئة بنجاح';
+            flash('تمت إضافة التصنيف بنجاح ✓');
+            redirect('categories.php');
         } catch (mysqli_sql_exception $e) {
-            $error = 'هذه الفئة موجودة مسبقًا';
+            $error = 'هذا التصنيف موجود مسبقًا';
         }
     }
 }
 
-$cats = $conn->query("SELECT c.*, (SELECT COUNT(*) FROM places p WHERE p.category_id=c.id) AS places_count FROM categories c ORDER BY c.id");
+$categories = $conn->query('SELECT c.*, (SELECT COUNT(*) FROM places p WHERE p.category_id = c.id) AS places_count FROM categories c ORDER BY c.id')->fetch_all(MYSQLI_ASSOC);
+
+$pageTitle = 'التصنيفات';
+$activeNav = 'categories';
+require __DIR__ . '/partials/header.php';
 ?>
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>إدارة التصنيفات - روح ينبع</title><link rel="stylesheet" href="../css/style.css?v=<?= substr((string)@md5_file(__DIR__ . '/../css/style.css'), 0, 8) ?>"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Markazi+Text:wght@500;600;700&display=swap" rel="stylesheet"></head><body>
-<nav class="navbar"><div class="container"><h1>🏷️ إدارة التصنيفات</h1><ul><li><a href="dashboard.php">لوحة التحكم</a></li><li><a href="places-list.php">الأماكن</a></li><li><a href="logout.php">تسجيل خروج</a></li></ul></div></nav>
+            <div class="dash-page-heading">
+                <div><p class="dash-eyebrow">المحتوى</p><h1>التصنيفات</h1><p>نظّم الأماكن في تصنيفات يسهل على الزائر تصفحها.</p></div>
+            </div>
 
-<section class="container">
-    <?php if($success): ?><div class="alert alert-success"><?=htmlspecialchars($success)?></div><?php endif; ?>
-    <?php if($error): ?><div class="alert alert-danger"><?=htmlspecialchars($error)?></div><?php endif; ?>
+            <div class="panel-columns">
+                <section class="dash-panel">
+                    <div class="dash-panel-heading"><div><h2>كل التصنيفات</h2></div></div>
+                    <div class="dash-table-wrap">
+                        <table class="dash-table">
+                            <thead><tr><th scope="col">الاسم</th><th scope="col">الوصف</th><th scope="col">الأماكن</th><th scope="col">الإجراءات</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($categories as $c): ?>
+                                    <tr>
+                                        <td><strong><?= category_icon($c['name']) ?> <?= e($c['name']) ?></strong></td>
+                                        <td><?= e($c['description']) ?></td>
+                                        <td><?= (int)$c['places_count'] ?></td>
+                                        <td><div class="panel-row-actions">
+                                            <a class="panel-link" href="edit_category.php?id=<?= (int)$c['id'] ?>">تعديل</a>
+                                            <?php if ((int)$c['places_count'] > 0): ?>
+                                                <button type="button" class="panel-link is-danger" disabled title="لا يمكن حذف تصنيف مرتبط بأماكن">حذف</button>
+                                            <?php else: ?>
+                                                <?= delete_button('delete_category.php', ['id' => $c['id']], 'حذف تصنيف "' . $c['name'] . '"؟') ?>
+                                            <?php endif; ?>
+                                        </div></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <?php if (!$categories): ?><tr><td colspan="4">لا توجد تصنيفات بعد.</td></tr><?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
 
-    <div style="background:white;padding:25px;border-radius:10px;margin:20px 0;box-shadow:0 4px 15px rgba(0,0,0,0.08);max-width:600px;">
-        <h3 style="color:var(--deep);margin-bottom:15px;">➕ إضافة فئة جديدة</h3>
-        <form method="post" class="contact-form">
-            <input type="hidden" name="action" value="add">
-            <input type="text" name="name" placeholder="اسم الفئة" required>
-            <input type="text" name="description" placeholder="وصف مختصر (اختياري)">
-            <button class="btn">إضافة</button>
-        </form>
-    </div>
-
-    <div class="table-responsive" style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.08);">
-        <table>
-            <thead><tr><th>الاسم</th><th>الوصف</th><th>عدد الأماكن</th><th>إجراءات</th></tr></thead>
-            <tbody>
-            <?php if ($cats->num_rows === 0): ?>
-                <tr><td colspan="4" style="text-align:center;padding:30px;">لا توجد فئات بعد</td></tr>
-            <?php else: while($c = $cats->fetch_assoc()): ?>
-                <tr>
-                    <td><?php echo category_icon($c['name']); ?> <?=htmlspecialchars($c['name'])?></td>
-                    <td><?=htmlspecialchars($c['description'])?></td>
-                    <td><?=(int)$c['places_count']?></td>
-                    <td class="action-btns">
-                        <a href="edit_category.php?id=<?=$c['id']?>" class="edit-btn">تعديل</a>
-                        <a href="delete_category.php?id=<?=$c['id']?>" class="delete-btn" onclick="return confirm('حذف هذه الفئة؟');">حذف</a>
-                    </td>
-                </tr>
-            <?php endwhile; endif; ?>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<footer><div class="container"><p>&copy; 2026 روح ينبع | جميع الحقوق محفوظة</p></div></footer>
-</body></html>
+                <form class="dash-panel panel-form" method="post">
+                    <h2>إضافة تصنيف</h2>
+                    <?php if ($error): ?><div class="alert alert-danger" role="alert"><?= e($error) ?></div><?php endif; ?>
+                    <?= csrf_field() ?>
+                    <label>اسم التصنيف *<input name="name" required maxlength="100" value="<?= e($values['name']) ?>"></label>
+                    <label>وصف مختصر (اختياري)<input name="description" maxlength="255" value="<?= e($values['description']) ?>"></label>
+                    <p class="panel-muted">تُختار الأيقونة واللون تلقائيًا من الاسم (مثل: شواطئ، معالم، جبال، مطاعم).</p>
+                    <div class="panel-actions"><button class="dash-button dash-button-primary" type="submit">إضافة</button></div>
+                </form>
+            </div>
+<?php require __DIR__ . '/partials/footer.php'; ?>

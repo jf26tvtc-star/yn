@@ -86,12 +86,14 @@ function yanbu_render_unavailable($detail = '') {
         header('Content-Type: text/html; charset=UTF-8');
         header('Retry-After: 60');
     }
-    $extra = $detail !== '' ? '<p style="color:#62738a;font-size:14px;direction:ltr;">' . htmlspecialchars($detail) . '</p>' : '';
+    // تفاصيل الخطأ التقنية تظهر فقط عند التصفح من نفس الجهاز (localhost)
+    $isLocalRequest = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+    $extra = $detail !== '' && $isLocalRequest ? '<p style="color:#62738a;font-size:14px;direction:ltr;">' . htmlspecialchars($detail) . '</p>' : '';
     echo '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الموقع غير متاح مؤقتًا</title></head>'
         . '<body style="font-family:Tahoma,sans-serif;background:#f3f6fa;color:#0f2340;display:grid;place-items:center;min-height:100vh;margin:0;padding:20px;">'
         . '<main style="background:#fff;border:1px solid #e1e8f0;border-radius:14px;padding:32px;max-width:520px;text-align:center;">'
         . '<h1 style="font-size:22px;">تعذّر الاتصال بقاعدة البيانات</h1>'
-        . '<p>الموقع غير متاح مؤقتًا. إذا كنت مدير الموقع، تأكد من ضبط متغيرات قاعدة البيانات ثم أعد المحاولة.</p>'
+        . '<p>الموقع غير متاح مؤقتًا. إذا كنت مدير الموقع، تأكد من تشغيل MySQL في XAMPP واستيراد database/schema.sql ثم أعد المحاولة.</p>'
         . $extra . '</main></body></html>';
     exit();
 }

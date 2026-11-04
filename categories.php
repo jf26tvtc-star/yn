@@ -1,55 +1,37 @@
 <?php
-session_start();
-include 'db.php';
+require __DIR__ . '/includes/bootstrap.php';
+$conn = db();
 
-$cats = $conn->query("SELECT c.*, (SELECT COUNT(*) FROM places p WHERE p.category_id=c.id) AS places_count,
-    COALESCE((SELECT i.image_path FROM places p2 JOIN images i ON i.place_id=p2.id WHERE p2.category_id=c.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1), '') AS cover
-    FROM categories c ORDER BY c.id");
+$categories = $conn->query("SELECT c.*, (SELECT COUNT(*) FROM places p WHERE p.category_id = c.id) AS places_count,
+    COALESCE((SELECT i.image_path FROM places p2 JOIN images i ON i.place_id = p2.id WHERE p2.category_id = c.id ORDER BY i.is_main DESC, i.id ASC LIMIT 1), '') AS cover
+    FROM categories c ORDER BY c.id")->fetch_all(MYSQLI_ASSOC);
+
+$pageTitle = 'التصنيفات السياحية';
+require __DIR__ . '/includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>التصنيفات السياحية - روح ينبع</title>
-    <link rel="stylesheet" href="css/style.css?v=<?= substr((string)@md5_file(__DIR__ . '/css/style.css'), 0, 8) ?>">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Markazi+Text:wght@500;600;700&display=swap" rel="stylesheet">
-</head>
-<body>
-    <!-- NAVBAR -->
-    <?php require __DIR__ . '/nav.php'; ?>
+        <section class="hero hero-small">
+            <div class="container">
+                <h1>التصنيفات السياحية</h1>
+                <p>تصفّح وجهات ينبع حسب نوعها: بحرية، تاريخية، طبيعية، وترفيهية</p>
+            </div>
+        </section>
 
-    <!-- HERO -->
-    <section class="hero">
-        <div class="container">
-            <h2>التصنيفات السياحية</h2>
-            <p>تصفّح وجهات ينبع حسب نوعها: بحرية، تاريخية، طبيعية، وترفيهية</p>
-        </div>
-    </section>
-
-    <!-- CATEGORIES -->
-    <section class="container">
-        <div class="category-grid">
-            <?php while ($c = $cats->fetch_assoc()): ?>
-                <a class="category-card <?php echo category_slug($c['name']); ?>" href="places.php?category=<?php echo urlencode($c['name']); ?>" style="display:block;text-decoration:none;color:inherit;">
-                    <img src="images/<?php echo htmlspecialchars(place_image($c['cover'])); ?>" alt="<?php echo htmlspecialchars($c['name']); ?>" style="width:100%;height:160px;object-fit:cover;display:block;">
-                    <div class="cc-body">
-                        <h3><?php echo category_icon($c['name']); ?> <?php echo htmlspecialchars($c['name']); ?></h3>
-                        <p><?php echo htmlspecialchars($c['description']); ?></p>
-                        <p style="margin-top:8px;color:var(--primary);font-weight:600;"><?php echo (int)$c['places_count']; ?> مكان مسجّل</p>
-                    </div>
-                </a>
-            <?php endwhile; ?>
-        </div>
-    </section>
-
-    <!-- FOOTER -->
-    <footer>
-        <div class="container">
-            <p>&copy; 2026 روح ينبع | جميع الحقوق محفوظة</p>
-            <p>📧 jf26tvtc@gmail.com | 📱 +96656789455</p>
-            <p class="footer-admin"><a href="admin/dashboard.php">لوحة التحكم</a></p>
-        </div>
-    </footer>
-</body>
-</html>
+        <section class="container">
+            <?php if ($categories): ?>
+                <div class="category-grid">
+                    <?php foreach ($categories as $c): ?>
+                        <a class="category-card <?= category_slug($c['name']) ?>" href="places.php?category=<?= urlencode($c['name']) ?>">
+                            <img src="<?= e(image_url($c['cover'])) ?>" alt="<?= e($c['name']) ?>" loading="lazy">
+                            <div class="cc-body">
+                                <h3><?= category_icon($c['name']) ?> <?= e($c['name']) ?></h3>
+                                <p><?= e($c['description']) ?></p>
+                                <p class="cc-count"><?= (int)$c['places_count'] ?> مكان مسجّل</p>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <p class="empty-note">لا توجد تصنيفات بعد.</p>
+            <?php endif; ?>
+        </section>
+<?php require __DIR__ . '/includes/footer.php'; ?>

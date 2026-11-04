@@ -1,6 +1,64 @@
 <?php
-session_start(); include '../db.php'; check_admin();
-if(isset($_GET['read'])) { $id=(int)$_GET['read']; $s=$conn->prepare('UPDATE messages SET is_read=1 WHERE id=?'); $s->bind_param('i',$id); $s->execute(); }
-$result=$conn->query('SELECT * FROM messages ORDER BY created_at DESC');
+require __DIR__ . '/partials/init.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
+    $id = (int)($_POST['id'] ?? 0);
+    if (($_POST['action'] ?? '') === 'delete') {
+        $stmt = $conn->prepare('DELETE FROM messages WHERE id = ?');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        flash('تم حذف الرسالة ✓');
+    } else {
+        $stmt = $conn->prepare('UPDATE messages SET is_read = 1 WHERE id = ?');
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+    }
+    redirect('messages.php');
+}
+
+$messages = $conn->query('SELECT * FROM messages ORDER BY created_at DESC, id DESC')->fetch_all(MYSQLI_ASSOC);
+
+$pageTitle = 'رسائل الزوار';
+$activeNav = 'messages';
+require __DIR__ . '/partials/header.php';
 ?>
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الرسائل - روح ينبع</title><link rel="stylesheet" href="../css/style.css?v=<?= substr((string)@md5_file(__DIR__ . '/../css/style.css'), 0, 8) ?>"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Markazi+Text:wght@500;600;700&display=swap" rel="stylesheet"></head><body><nav class="navbar"><div class="container"><h1>📬 رسائل الزوار</h1><ul><li><a href="dashboard.php">لوحة التحكم</a></li><li><a href="places-list.php">الأماكن</a></li><li><a href="logout.php">تسجيل خروج</a></li></ul></div></nav><section class="container"><h2>الرسائل</h2><div class="table-responsive"><table><thead><tr><th>الاسم</th><th>البريد</th><th>الموضوع</th><th>الرسالة</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody><?php while($m=$result->fetch_assoc()): ?><tr><td><?=htmlspecialchars($m['name'])?></td><td><?=htmlspecialchars($m['email'])?></td><td><?=htmlspecialchars($m['subject'])?></td><td><?=nl2br(htmlspecialchars($m['message']))?></td><td><?php if($m['is_read']): ?>مقروءة<?php else: ?><a class="edit-btn" href="?read=<?=$m['id']?>">تحديد كمقروءة</a><?php endif; ?></td><td><?=htmlspecialchars($m['created_at'])?></td></tr><?php endwhile; ?></tbody></table></div></section></body></html>
+            <div class="dash-page-heading">
+                <div><p class="dash-eyebrow">التواصل</p><h1>رسائل الزوار</h1><p>الرسائل المرسلة من صفحة "تواصل معنا".</p></div>
+            </div>
+
+            <section class="dash-panel">
+                <?php if ($messages): ?>
+                    <div class="dash-table-wrap">
+                        <table class="dash-table messages-table">
+                            <thead><tr><th scope="col">المرسل</th><th scope="col">الموضوع والرسالة</th><th scope="col">التاريخ</th><th scope="col">الإجراءات</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($messages as $m): ?>
+                                    <tr class="<?= $m['is_read'] ? '' : 'is-unread' ?>">
+                                        <td>
+                                            <strong><?= e($m['name']) ?></strong>
+                                            <?php if (!$m['is_read']): ?><span class="dash-unread">جديدة</span><?php endif; ?>
+                                            <small><a href="mailto:<?= e($m['email']) ?>"><?= e($m['email']) ?></a></small>
+                                            <?php if (!empty($m['phone'])): ?><small dir="ltr"><?= e($m['phone']) ?></small><?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <strong><?= e($m['subject'] !== '' ? $m['subject'] : 'بدون عنوان') ?></strong>
+                                            <p><?= nl2br(e($m['message'])) ?></p>
+                                        </td>
+                                        <td><time datetime="<?= e(date('c', strtotime($m['created_at']))) ?>"><?= e(date('Y/m/d H:i', strtotime($m['created_at']))) ?></time></td>
+                                        <td><div class="panel-row-actions">
+                                            <?php if (!$m['is_read']): ?>
+                                                <form class="inline-form" method="post"><?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$m['id'] ?>"><button type="submit" class="panel-link">تحديد كمقروءة</button></form>
+                                            <?php endif; ?>
+                                            <?= delete_button('messages.php', ['id' => $m['id'], 'action' => 'delete'], 'حذف هذه الرسالة نهائيًا؟') ?>
+                                        </div></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="dash-empty"><span><?= admin_icon('mail') ?></span><h3>لا توجد رسائل بعد</h3><p>ستظهر رسائل الزوار هنا عند وصولها.</p></div>
+                <?php endif; ?>
+            </section>
+<?php require __DIR__ . '/partials/footer.php'; ?>

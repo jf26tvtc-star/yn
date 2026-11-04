@@ -1,9 +1,0 @@
-# إعداد GitHub Pages: يُنشر الموقع الثابت فقط (صفحات HTML + css + js + images + data/site.json).
-# ملفات PHP (ومنها مجلدا admin/ و includes/ بالكامل) تعمل محليًا على XAMPP فقط ولا تُنشر.
-# ملاحظة: لا تضف "admin" هنا؛ Jekyll يستبعد أي ملف يبدأ اسمه بالنمط، فيستبعد admin.html (لوحة التحكم) أيضًا.
-exclude:
-  - "*.php"
-  - "*.sql"
-  - "*.txt"
-  - "data/*.tmp"
-  - worker
